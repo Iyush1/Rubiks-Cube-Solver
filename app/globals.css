@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+:root {
+  --background: #050505;
+  --foreground: #f3f0d7;
+  --bg-mid: #181818;
+  --scanline: rgb(255 255 255 / 0.025);
+  --prompt-shadow: #592f6f;
+  --caret: #ffcf45;
+  --caret-shadow: #854f00;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-bg-mid: var(--bg-mid);
+  --color-caret: var(--caret);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-pixel: var(--font-press-start);
+  --animate-scanlines: scanlines 8s linear infinite;
+  --animate-console-flicker: console-flicker 4s steps(1, end) infinite;
+}
+
+@keyframes scanlines {
+  from {
+    background-position: 0 0;
+  }
+
+  to {
+    background-position: 0 120px;
+  }
+}
+
+@keyframes console-flicker {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+
+  3% {
+    opacity: 0.04;
+  }
+
+  3.5% {
+    opacity: 0.2;
+  }
+
+  12% {
+    opacity: 0.1;
+  }
+
+  12.5% {
+    opacity: 0.18;
+  }
+
+  70% {
+    opacity: 0.12;
+  }
+
+  70.5% {
+    opacity: 0.03;
+  }
+}
