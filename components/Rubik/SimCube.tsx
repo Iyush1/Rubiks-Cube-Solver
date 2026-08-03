@@ -30,6 +30,7 @@ import {
 import { Cubelet, type CubeletReady } from "./Cublet";
 import { applyStateToScene, useCubeController } from "./useCubeController";
 import { usePageTransition } from "@/app/transition/transition-provider";
+import { takeBeginnerSimState } from "@/utils/beginnerCubeSession";
 
 const PIXELATION = 2; // 1 = normal resolution, higher = chunkier pixels
 const PIECE_COUNT = PIECE_MANIFEST.length;
@@ -59,6 +60,7 @@ const MOVE_BUTTONS = FACES.flatMap((face) => [
 ]);
 
 type CubeSceneProps = {
+  initialState: SimCubeState;
   onControllerReady: (requestTurn: (face: Face, q: number) => void) => void;
   onStateChange: (state: SimCubeState) => void;
 };
@@ -71,13 +73,14 @@ type CubeSceneProps = {
  * them down and rebuild on every render, which shows up as a flash.
  */
 const CubeScene = memo(function CubeScene({
+  initialState,
   onControllerReady,
   onStateChange,
 }: CubeSceneProps) {
   const cubeRootRef = useRef<THREE.Group | null>(null);
   const piecesRef = useRef<Map<string, CubeletReady>>(new Map());
   const anchorsRef = useRef<Map<string, THREE.Object3D>>(new Map());
-  const stateRef = useRef<SimCubeState>(createSolvedState());
+  const stateRef = useRef<SimCubeState>(initialState);
   const [loadedCount, setLoadedCount] = useState(0);
   const [view, setView] = useState<{ cellSize: number; distance: number }>();
   const calibratedRef = useRef(false);
@@ -218,9 +221,15 @@ const CubeScene = memo(function CubeScene({
 export function RubiksCube() {
   const { go } = usePageTransition();
   const requestTurnRef = useRef<(face: Face, q: number) => void>(() => {});
+  // Beginner picker stashes a converted state in sessionStorage; Advanced (and
+  // a bare visit) fall back to solved. Captured once so the scene props stay
+  // stable — see CubeScene's memo note about EffectComposer.
+  const [initialState] = useState(
+    () => takeBeginnerSimState() ?? createSolvedState(),
+  );
   // Only what the UI actually displays lives in React state; the cube itself is
   // owned by the scene, so turning never re-renders the Canvas subtree.
-  const [solved, setSolved] = useState(true);
+  const [solved, setSolved] = useState(() => isSolved(initialState));
 
   const onControllerReady = useCallback(
     (requestTurn: (face: Face, q: number) => void) => {
@@ -249,6 +258,7 @@ export function RubiksCube() {
         }}
       >
         <CubeScene
+          initialState={initialState}
           onControllerReady={onControllerReady}
           onStateChange={onStateChange}
         />
