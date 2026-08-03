@@ -19,13 +19,18 @@ type SkillLevelMenuProps = {
   onSelect?: (level: SkillLevel) => void;
 };
 
-export function SkillLevelMenu({ onSelect }: SkillLevelMenuProps) {
+export function  SkillLevelMenu({ onSelect }: SkillLevelMenuProps) {
   const { go } = usePageTransition();
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const confirm = (option: MenuOption) => {
     if (option.action === "exit") {
       go("/");
+      return;
+    }
+
+    if (option.id === "advanced") {
+      go("/rubiks");
       return;
     }
 
