@@ -20,15 +20,22 @@ import {
   PIECE_MANIFEST,
 } from "@/utils/cubeGeometry";
 import {
+  beginnerDaisyInstruction,
+  topCenterButtonLabel,
+} from "@/utils/cubeOrientation";
+import {
   createSolvedState,
   FACES,
   gridPosEqual,
   isSolved,
-  type Face,
   type SimCubeState,
 } from "@/utils/simCubeState";
 import { Cubelet, type CubeletReady } from "./Cublet";
-import { applyStateToScene, useCubeController } from "./useCubeController";
+import {
+  applyStateToScene,
+  useCubeController,
+  type CubeControllerApi,
+} from "./useCubeController";
 import { usePageTransition } from "@/app/transition/transition-provider";
 import { takeBeginnerSimState } from "@/utils/beginnerCubeSession";
 
@@ -61,7 +68,7 @@ const MOVE_BUTTONS = FACES.flatMap((face) => [
 
 type CubeSceneProps = {
   initialState: SimCubeState;
-  onControllerReady: (requestTurn: (face: Face, q: number) => void) => void;
+  onControllerReady: (api: CubeControllerApi) => void;
   onStateChange: (state: SimCubeState) => void;
 };
 
@@ -88,7 +95,7 @@ const CubeScene = memo(function CubeScene({
 
   const ready = view !== undefined;
 
-  const { requestTurn } = useCubeController({
+  const controller = useCubeController({
     cubeRootRef,
     anchorsRef,
     stateRef,
@@ -98,8 +105,8 @@ const CubeScene = memo(function CubeScene({
   });
 
   useEffect(() => {
-    onControllerReady(requestTurn);
-  }, [onControllerReady, requestTurn]);
+    onControllerReady(controller);
+  }, [onControllerReady, controller]);
 
   const handleReady = useCallback((id: string, piece: CubeletReady) => {
     const alreadyLoaded = piecesRef.current.has(id);
@@ -218,9 +225,16 @@ const CubeScene = memo(function CubeScene({
   );
 });
 
+const idleController: CubeControllerApi = {
+  requestTurn: () => {},
+  requestWholeCubeTurn: () => {},
+  requestToggleTopCenter: () => {},
+  getState: () => createSolvedState(),
+};
+
 export function RubiksCube() {
   const { go } = usePageTransition();
-  const requestTurnRef = useRef<(face: Face, q: number) => void>(() => {});
+  const controllerRef = useRef<CubeControllerApi>(idleController);
   // Beginner picker stashes a converted state in sessionStorage; Advanced (and
   // a bare visit) fall back to solved. Captured once so the scene props stay
   // stable — see CubeScene's memo note about EffectComposer.
@@ -230,16 +244,21 @@ export function RubiksCube() {
   // Only what the UI actually displays lives in React state; the cube itself is
   // owned by the scene, so turning never re-renders the Canvas subtree.
   const [solved, setSolved] = useState(() => isSolved(initialState));
-
-  const onControllerReady = useCallback(
-    (requestTurn: (face: Face, q: number) => void) => {
-      requestTurnRef.current = requestTurn;
-    },
-    [],
+  const [instruction, setInstruction] = useState(() =>
+    beginnerDaisyInstruction(initialState),
   );
+  const [topButtonLabel, setTopButtonLabel] = useState(() =>
+    topCenterButtonLabel(initialState),
+  );
+
+  const onControllerReady = useCallback((api: CubeControllerApi) => {
+    controllerRef.current = api;
+  }, []);
 
   const onStateChange = useCallback((next: SimCubeState) => {
     setSolved(isSolved(next));
+    setInstruction(beginnerDaisyInstruction(next));
+    setTopButtonLabel(topCenterButtonLabel(next));
   }, []);
 
   return (
@@ -265,11 +284,27 @@ export function RubiksCube() {
       </Canvas>
 
       <p
+        className="max-w-xl text-center font-(family-name:--font-press-start) text-[clamp(0.35rem,1.1vw,0.55rem)] leading-[1.9] uppercase text-foreground/70 [text-shadow:2px_2px_0_var(--prompt-shadow)]"
+        aria-live="polite"
+      >
+        {instruction}
+      </p>
+
+      <p
         className="font-(family-name:--font-press-start) text-[clamp(0.45rem,1.2vw,0.65rem)] uppercase tracking-wide text-foreground [text-shadow:2px_2px_0_var(--prompt-shadow)]"
         aria-live="polite"
       >
         {solved ? "solved" : "scrambled"}
       </p>
+
+      <button
+        type="button"
+        aria-label={`Rotate the cube so ${topButtonLabel.toLowerCase()}`}
+        className="cursor-pointer border border-caret/60 bg-transparent px-3 py-2 font-(family-name:--font-press-start) text-[clamp(0.4rem,1.1vw,0.55rem)] uppercase text-caret [text-shadow:2px_2px_0_var(--caret-shadow)] transition-colors hover:bg-caret/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-caret"
+        onClick={() => controllerRef.current.requestToggleTopCenter()}
+      >
+        {topButtonLabel}
+      </button>
 
       <div className="flex max-w-xl flex-wrap justify-center gap-2">
         {MOVE_BUTTONS.map(({ label, face, quarterTurns }) => (
@@ -278,7 +313,9 @@ export function RubiksCube() {
             type="button"
             aria-label={`Turn ${face} ${quarterTurns === -1 ? "counter-clockwise" : "clockwise"}`}
             className="cursor-pointer border border-foreground/40 bg-transparent px-2.5 py-1.5 font-(family-name:--font-press-start) text-[clamp(0.4rem,1vw,0.55rem)] uppercase text-foreground [text-shadow:2px_2px_0_var(--prompt-shadow)] transition-colors hover:bg-foreground/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
-            onClick={() => requestTurnRef.current(face, quarterTurns)}
+            onClick={() =>
+              controllerRef.current.requestTurn(face, quarterTurns)
+            }
           >
             {label}
           </button>
